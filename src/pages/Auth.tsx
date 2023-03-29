@@ -1,56 +1,65 @@
-import { SignInMethod } from 'firebase/auth';
 import { useEffect } from 'react';
 import {
   ActionFunctionArgs,
-  useSearchParams,
   redirect,
+  json,
   useNavigate,
 } from 'react-router-dom';
-import AuthLayout from '../components/AuthLayout';
-import ForgotForm from '../components/ForgotForm';
-import LoginForm from '../components/LoginForm';
-import SignupForm from '../components/SignupForm';
+import AuthForm from '../components/AuthForm';
+import AuthLayout from '../layouts/AuthLayout';
 import store, { useAppSelector } from '../store';
-import { login } from '../store/auth';
+import { login, signup } from '../store/auth';
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
-
   const auth = useAppSelector((state) => state.auth.authenticated);
-
   useEffect(() => {
-    auth && navigate('/');
+    if (auth) {
+      console.log('navigating to / in useState');
+      navigate('/');
+    }
   }, [auth]);
-  const [searchParams] = useSearchParams();
-  const mode = searchParams.get('mode') || 'login';
-  const isLogin = mode === 'login';
-  const isSignup = mode === 'signup';
-  const isForgot = mode === 'forgot';
-
   return (
-    <AuthLayout mode={mode}>
-      {isLogin && <LoginForm />}
-      {isForgot && <ForgotForm />}
-      {isSignup && <SignupForm />}
+    <AuthLayout>
+      <AuthForm />
     </AuthLayout>
   );
 };
 
 export default AuthPage;
 
-export async function action({ request }: ActionFunctionArgs) {
-  const data = await request.formData();
-  const email = data.get('email') as string;
-  const password = data.get('password') as string;
-  store.dispatch(login({ email, password }));
-  return null;
+export interface authActionData {
+  error: boolean;
+  header: string;
+  message: any;
 }
 
-export async function loader() {
-  const state = store.getState();
-  if (state.auth.authenticated) {
-    return redirect('/');
-  } else {
+export async function action({ request }: ActionFunctionArgs) {
+  const searchParams = new URL(request.url).searchParams;
+  const mode = searchParams.get('mode') || 'login';
+  const formData = await request.formData();
+  const authData = {
+    email: formData.get('email')!.toString(),
+    password: formData.get('password')!.toString(),
+  };
+
+  if (mode === 'forgot') {
     return null;
   }
+  if (mode === 'signup') {
+    await store.dispatch(signup(authData));
+  }
+  if (mode === 'login') {
+    await store.dispatch(login(authData));
+  }
+  const error = store.getState().auth.error;
+  if (error) {
+    return json<authActionData>(
+      { error: true, message: error.message, header: error.header },
+      {
+        status: 401,
+      }
+    );
+  }
+  return null;
 }

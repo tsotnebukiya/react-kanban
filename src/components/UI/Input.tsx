@@ -6,6 +6,7 @@ export interface InputProps {
   name: string;
   placeholder?: string;
   required?: boolean;
+  minLength?: number;
 }
 
 const Input: ForwardRefRenderFunction<HTMLInputElement, InputProps> = (
@@ -21,6 +22,7 @@ const Input: ForwardRefRenderFunction<HTMLInputElement, InputProps> = (
         required={props.required}
         placeholder={props.placeholder}
         ref={ref}
+        minLength={props.minLength}
         className='className="bg-gray-50 border border-gray-300 text-gray-900 sm:text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"'
       />
     </Fragment>

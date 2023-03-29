@@ -1,25 +1,26 @@
 import { createSlice, PayloadAction, createAsyncThunk } from '@reduxjs/toolkit';
 import {
-  onAuthStateChanged,
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
+  User,
 } from 'firebase/auth';
 import { RootStore } from '.';
 import auth from '../firebase';
 
 // Create Initial State
 export interface AuthState {
-  displayName?: string | null;
-  email?: string | null;
+  user: User | null;
   authenticated?: boolean | null;
-  error?: any;
+  error?: { header: string; message: any } | null;
+  authChecked?: boolean;
 }
 
 const initialState: AuthState = {
-  displayName: null,
-  email: null,
+  user: null,
   authenticated: null,
   error: null,
+  authChecked: false,
 };
 
 // Async thunk to log in a user
@@ -37,17 +38,31 @@ export const login = createAsyncThunk(
         credentials.email,
         credentials.password
       );
-      const { displayName, email } = response.user;
-      return { displayName, email, authenticated: true };
+      return { user: response.user, authenticated: true };
     } catch (err: any) {
       console.log(`Login failed: ${err.message}`);
       return rejectWithValue(err.message);
     }
   }
 );
+export const signup = createAsyncThunk(
+  'auth/signup',
+  async (credentials: LoginCredentials, { rejectWithValue }) => {
+    try {
+      const response = await createUserWithEmailAndPassword(
+        auth,
+        credentials.email,
+        credentials.password
+      );
+      return { user: response.user, authenticated: true };
+    } catch (err: any) {
+      console.log(`Signup failed: ${err.message}`);
+      return rejectWithValue(err.message);
+    }
+  }
+);
 
 // Async thunk to log out user
-
 export const logout = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue, getState }) => {
@@ -56,17 +71,17 @@ export const logout = createAsyncThunk(
       try {
         await signOut(auth);
         return {
-          displayName: null,
-          email: null,
+          user: null,
           authenticated: null,
           error: null,
         };
       } catch (err: any) {
         console.log(`Logout failed: ${err.message}`);
+        console.log(err);
         return rejectWithValue(err);
       }
     } else {
-      return { displayName: null, email: null, authenticated: null };
+      return { user: null, authenticated: null };
     }
   }
 );
@@ -78,39 +93,47 @@ const authSlice = createSlice({
   reducers: {
     loggedIn: (state, action: PayloadAction<AuthState>) => {
       state.authenticated = true;
-      state.displayName = action.payload.displayName;
-      state.email = action.payload.email;
+      state.user = action.payload.user;
       state.error = null;
     },
     loggedOut: (state) => {
       state.authenticated = null;
-      state.email = null;
-      state.displayName = null;
+      state.user = null;
       state.error = null;
+    },
+    authChecked: (state, action: PayloadAction<boolean>) => {
+      state.authChecked = action.payload;
     },
   },
   extraReducers: (builder) => {
     builder
       .addCase(login.fulfilled, (state, action: PayloadAction<AuthState>) => {
         state.authenticated = action.payload.authenticated;
-        state.email = action.payload.email;
-        state.displayName = action.payload.displayName;
+        state.user = action.payload.user;
         state.error = null;
       })
       .addCase(login.rejected, (state, action) => {
         state.authenticated = null;
-        state.email = null;
-        state.displayName = null;
-        state.error = action.payload;
+        state.user = null;
+        state.error = { header: 'Logind failed', message: action.payload };
       })
       .addCase(logout.fulfilled, (state) => {
         state.authenticated = null;
-        state.email = null;
-        state.displayName = null;
+        state.user = null;
         state.error = null;
       })
       .addCase(logout.rejected, (state, action) => {
-        state.error = action.payload;
+        state.error = { header: 'Logout failed', message: action.payload };
+      })
+      .addCase(signup.fulfilled, (state, action: PayloadAction<AuthState>) => {
+        state.authenticated = action.payload.authenticated;
+        state.user = action.payload.user;
+        state.error = null;
+      })
+      .addCase(signup.rejected, (state, action) => {
+        state.authenticated = null;
+        state.user = null;
+        state.error = { header: 'Signup failed', message: action.payload };
       });
   },
 });
